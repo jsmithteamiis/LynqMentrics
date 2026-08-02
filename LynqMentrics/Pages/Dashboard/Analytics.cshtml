@@ -1,0 +1,131 @@
+@page
+@model LynqMentrics.Pages.Dashboard.AnalyticsModel
+@{
+    ViewData["Title"] = "Analytics";
+}
+
+<div class="space-y-6">
+    <div>
+        <h1 class="text-3xl font-bold text-white">Link analytics</h1>
+        <p class="text-slate-300">Performance details for your short link.</p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-3">
+        <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+            <p class="text-sm text-slate-400">Total Clicks</p>
+            <p id="totalClicks" class="mt-2 text-3xl font-bold text-white">-</p>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+            <p class="text-sm text-slate-400">Clicks Today</p>
+            <p id="clicksToday" class="mt-2 text-3xl font-bold text-white">-</p>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+            <p class="text-sm text-slate-400">Clicks This Week</p>
+            <p id="clicksThisWeek" class="mt-2 text-3xl font-bold text-white">-</p>
+        </div>
+    </div>
+
+    <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-6">
+        <h2 class="mb-4 text-lg font-semibold text-white">Last 7 days</h2>
+        <canvas id="clickChart" height="120"></canvas>
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-2">
+        <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+            <h3 class="mb-3 text-base font-semibold text-white">Top Referrers</h3>
+            <div id="topReferrers"></div>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+            <h3 class="mb-3 text-base font-semibold text-white">Top Countries</h3>
+            <div id="topCountries"></div>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+            <h3 class="mb-3 text-base font-semibold text-white">Top Devices</h3>
+            <div id="topDevices"></div>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+            <h3 class="mb-3 text-base font-semibold text-white">Top Browsers</h3>
+            <div id="topBrowsers"></div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const linkId = "@Model.LinkId";
+
+        function renderTable(targetId, keyName, items) {
+            const target = document.getElementById(targetId);
+            if (!Array.isArray(items) || items.length === 0) {
+                target.innerHTML = '<p class="text-sm text-slate-400">No data yet.</p>';
+                return;
+            }
+
+            target.innerHTML = `
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-slate-400">
+                            <th class="py-2 font-medium">${keyName}</th>
+                            <th class="py-2 font-medium">Clicks</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800 text-slate-200">
+                        ${items.map(item => `<tr><td class="py-2">${Object.values(item)[0]}</td><td class="py-2">${item.count}</td></tr>`).join("")}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        async function loadStats() {
+            const response = await fetch(`/api/links/${linkId}/stats`);
+            if (!response.ok) {
+                return;
+            }
+
+            const stats = await response.json();
+            document.getElementById("totalClicks").textContent = stats.totalClicks;
+            document.getElementById("clicksToday").textContent = stats.clicksToday;
+            document.getElementById("clicksThisWeek").textContent = stats.clicksThisWeek;
+
+            const labels = stats.last7Days.map(d => d.date);
+            const values = stats.last7Days.map(d => d.clicks);
+
+            new Chart(document.getElementById("clickChart"), {
+                type: "line",
+                data: {
+                    labels,
+                    datasets: [{
+                        label: "Clicks",
+                        data: values,
+                        borderColor: "#4F46E5",
+                        backgroundColor: "rgba(79,70,229,0.25)",
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: "#94a3b8" },
+                            grid: { color: "rgba(148,163,184,0.2)" }
+                        },
+                        x: {
+                            ticks: { color: "#94a3b8" },
+                            grid: { color: "rgba(148,163,184,0.1)" }
+                        }
+                    }
+                }
+            });
+
+            renderTable("topReferrers", "Source", stats.topReferrers);
+            renderTable("topCountries", "Country", stats.topCountries);
+            renderTable("topDevices", "Device", stats.topDevices);
+            renderTable("topBrowsers", "Browser", stats.topBrowsers);
+        }
+
+        loadStats();
+    </script>
+}

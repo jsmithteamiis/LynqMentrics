@@ -1,0 +1,108 @@
+@page
+@model LynqMentrics.Pages.IndexModel
+@{
+    ViewData["Title"] = "LynqMentrics";
+}
+
+<section class="grid gap-10 lg:grid-cols-2 lg:gap-12">
+    <div class="space-y-6">
+        <p class="inline-flex rounded-full border border-brandCyan/40 bg-brandCyan/10 px-4 py-1 text-sm font-medium text-brandCyan">Short links. Deep insights.</p>
+        <h1 class="text-4xl font-extrabold tracking-tight text-white sm:text-5xl">Shorten a URL. Discover what your audience really clicks.</h1>
+        <p class="text-lg leading-8 text-slate-300">LynqMentrics turns every link you share into a live analytics report.</p>
+        <div class="grid gap-4 text-sm text-slate-300 sm:grid-cols-2">
+            <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <p class="font-semibold text-brandEmerald">Track engagement</p>
+                <p class="mt-1">See clicks, referrers, devices, and countries in real time.</p>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <p class="font-semibold text-brandIndigo">Built for creators</p>
+                <p class="mt-1">Create branded slugs and monitor what performs.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-2xl shadow-brandIndigo/10">
+        <h2 class="text-xl font-semibold text-white">Create your short link</h2>
+        <p class="mt-1 text-sm text-slate-300">Free plan: up to 50 links per user.</p>
+        <form id="shorten-form" class="mt-6 space-y-4">
+            <div>
+                <label for="originalUrl" class="mb-1 block text-sm font-medium text-slate-200">Long URL</label>
+                <input id="originalUrl" name="originalUrl" type="url" required placeholder="https://example.com/article" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none ring-brandIndigo transition focus:border-brandIndigo focus:ring-2" />
+            </div>
+            <div>
+                <label for="customSlug" class="mb-1 block text-sm font-medium text-slate-200">Custom slug (optional)</label>
+                <input id="customSlug" name="customSlug" type="text" placeholder="mybrand" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none ring-brandIndigo transition focus:border-brandIndigo focus:ring-2" />
+            </div>
+            <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg bg-brandIndigo px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500">Shorten</button>
+        </form>
+
+        <div id="result" class="mt-5 hidden rounded-xl border border-brandEmerald/40 bg-brandEmerald/10 p-4 text-sm text-brandEmerald"></div>
+        <div id="error" class="mt-5 hidden rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-300"></div>
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        const form = document.getElementById("shorten-form");
+        const resultBox = document.getElementById("result");
+        const errorBox = document.getElementById("error");
+
+        function hideMessages() {
+            resultBox.classList.add("hidden");
+            errorBox.classList.add("hidden");
+            resultBox.innerHTML = "";
+            errorBox.textContent = "";
+        }
+
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.classList.remove("hidden");
+        }
+
+        async function copyToClipboard(value) {
+            await navigator.clipboard.writeText(value);
+        }
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            hideMessages();
+
+            const payload = {
+                originalUrl: document.getElementById("originalUrl").value.trim(),
+                customSlug: document.getElementById("customSlug").value.trim() || null
+            };
+
+            const response = await fetch("/api/links", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.status === 401) {
+                showError('Please sign in first to create links. <a class="underline" href="/Identity/Account/Login">Sign in with Google or email</a>.');
+                errorBox.innerHTML = 'Please sign in first to create links. <a class="underline" href="/Identity/Account/Login">Sign in with Google or email</a>.';
+                return;
+            }
+
+            const content = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                showError(content.error ?? "Could not create short link.");
+                return;
+            }
+
+            const shortUrl = content.shortUrl;
+            resultBox.innerHTML = `
+                <p class="mb-3 font-medium">Your short link is ready:</p>
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <a href="${shortUrl}" class="break-all text-brandEmerald underline" target="_blank" rel="noopener noreferrer">${shortUrl}</a>
+                    <button id="copy-btn" type="button" class="inline-flex items-center justify-center rounded-md border border-brandEmerald/40 px-3 py-1.5 text-xs font-semibold text-brandEmerald hover:bg-brandEmerald/10">Copy</button>
+                </div>
+            `;
+            resultBox.classList.remove("hidden");
+
+            document.getElementById("copy-btn").addEventListener("click", async () => {
+                await copyToClipboard(shortUrl);
+            });
+        });
+    </script>
+}

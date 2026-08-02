@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - LynqMentrics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brandIndigo: '#4F46E5',
+                        brandCyan: '#06B6D4',
+                        brandEmerald: '#10B981'
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+    <header class="border-b border-slate-800 bg-slate-900/70 backdrop-blur">
+        <nav class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+            <a asp-page="/Index" class="text-xl font-extrabold tracking-tight text-white">Lyn<span class="text-brandCyan">q</span>Mentrics</a>
+            <div class="flex items-center gap-4 text-sm font-medium">
+                <a asp-page="/Index" class="text-slate-200 hover:text-white">Home</a>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <a asp-page="/Dashboard/Index" class="text-slate-200 hover:text-white">Dashboard</a>
+                    <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="/" method="post">
+                        <button type="submit" class="rounded-md border border-slate-700 px-3 py-1.5 text-slate-100 hover:border-brandCyan hover:text-white">Sign out</button>
+                    </form>
+                }
+                else
+                {
+                    <a asp-area="Identity" asp-page="/Account/Login" class="rounded-md border border-slate-700 px-3 py-1.5 text-slate-100 hover:border-brandCyan hover:text-white">Sign in</a>
+                }
+            </div>
+        </nav>
+    </header>
+
+    <main class="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+        @RenderBody()
+    </main>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

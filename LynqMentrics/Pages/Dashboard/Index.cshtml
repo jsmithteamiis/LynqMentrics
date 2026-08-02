@@ -1,0 +1,102 @@
+@page
+@model LynqMentrics.Pages.Dashboard.IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="space-y-6">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-white">Your links</h1>
+            <p class="text-slate-300">Manage, copy, and inspect performance for every link.</p>
+        </div>
+        <a asp-page="/Index" class="inline-flex items-center rounded-lg bg-brandIndigo px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Create link</a>
+    </div>
+
+    <div id="feedback" class="hidden rounded-lg border px-4 py-3 text-sm"></div>
+
+    <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/70">
+        <table class="min-w-full divide-y divide-slate-800 text-sm">
+            <thead class="bg-slate-900 text-left text-slate-300">
+                <tr>
+                    <th class="px-4 py-3 font-semibold">Short URL</th>
+                    <th class="px-4 py-3 font-semibold">Original URL</th>
+                    <th class="px-4 py-3 font-semibold">Created At</th>
+                    <th class="px-4 py-3 font-semibold">Clicks</th>
+                    <th class="px-4 py-3 font-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="links-body" class="divide-y divide-slate-800 text-slate-200"></tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const linksBody = document.getElementById("links-body");
+        const feedback = document.getElementById("feedback");
+
+        function setFeedback(message, success = true) {
+            feedback.className = success
+                ? "rounded-lg border border-brandEmerald/40 bg-brandEmerald/10 px-4 py-3 text-sm text-brandEmerald"
+                : "rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-300";
+            feedback.textContent = message;
+        }
+
+        async function loadLinks() {
+            const response = await fetch("/api/links");
+            if (!response.ok) {
+                setFeedback("Could not load your links.", false);
+                return;
+            }
+
+            const links = await response.json();
+            if (!Array.isArray(links) || links.length === 0) {
+                linksBody.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">No links yet. Create one from the home page.</td></tr>`;
+                return;
+            }
+
+            linksBody.innerHTML = links.map(link => {
+                const shortUrl = `${window.location.origin}/${link.shortCode}`;
+                return `
+                    <tr>
+                        <td class="px-4 py-3"><a class="underline text-brandCyan" href="${shortUrl}" target="_blank" rel="noopener noreferrer">${shortUrl}</a></td>
+                        <td class="px-4 py-3 max-w-xs truncate" title="${link.originalUrl}">${link.originalUrl}</td>
+                        <td class="px-4 py-3">${new Date(link.createdAt).toLocaleString()}</td>
+                        <td class="px-4 py-3">${link.clicksCount}</td>
+                        <td class="px-4 py-3">
+                            <div class="flex flex-wrap gap-2">
+                                <a class="rounded-md border border-slate-700 px-2 py-1 text-xs hover:border-brandCyan" href="/Dashboard/Analytics?linkId=${link.id}">Analytics</a>
+                                <button data-copy="${shortUrl}" class="rounded-md border border-slate-700 px-2 py-1 text-xs hover:border-brandEmerald">Copy</button>
+                                <button data-delete="${link.id}" class="rounded-md border border-slate-700 px-2 py-1 text-xs hover:border-rose-400">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+
+            linksBody.querySelectorAll("button[data-copy]").forEach(button => {
+                button.addEventListener("click", async () => {
+                    await navigator.clipboard.writeText(button.dataset.copy);
+                    setFeedback("Copied to clipboard.");
+                });
+            });
+
+            linksBody.querySelectorAll("button[data-delete]").forEach(button => {
+                button.addEventListener("click", async () => {
+                    const response = await fetch(`/api/links/${button.dataset.delete}`, {
+                        method: "DELETE"
+                    });
+                    if (!response.ok) {
+                        setFeedback("Could not delete the link.", false);
+                        return;
+                    }
+                    setFeedback("Link deleted.");
+                    await loadLinks();
+                });
+            });
+        }
+
+        loadLinks();
+    </script>
+}
