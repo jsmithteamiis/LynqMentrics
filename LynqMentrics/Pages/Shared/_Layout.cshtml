@@ -21,7 +21,9 @@
                 {
                     <a asp-page="/Dashboard/Index" class="text-slate-200 hover:text-white">Dashboard</a>
                     <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="/" method="post">
-                        <button type="submit" class="rounded-md border border-slate-700 px-3 py-1.5 text-slate-100 hover:border-brandCyan hover:text-white">Sign out</button>
+                        <button type="submit" class="inline-flex items-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-white hover:border-brandCyan" aria-label="Sign out">
+                            Sign out
+                        </button>
                     </form>
                 }
                 else
