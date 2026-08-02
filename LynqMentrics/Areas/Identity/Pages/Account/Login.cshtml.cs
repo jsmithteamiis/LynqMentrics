@@ -55,6 +55,8 @@ namespace LynqMentrics.Areas.Identity.Pages.Account
         [TempData]
         public string ErrorMessage { get; set; }
 
+        public bool IsDemoPrefill { get; private set; }
+
         /// <summary>
         ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
         ///     directly from your code. This API may change or be removed in future releases.
@@ -85,7 +87,7 @@ namespace LynqMentrics.Areas.Identity.Pages.Account
             public bool RememberMe { get; set; }
         }
 
-        public async Task OnGetAsync(string returnUrl = null)
+        public async Task OnGetAsync(string returnUrl = null, bool demo = false)
         {
             if (!string.IsNullOrEmpty(ErrorMessage))
             {
@@ -100,6 +102,14 @@ namespace LynqMentrics.Areas.Identity.Pages.Account
             ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
 
             ReturnUrl = returnUrl;
+            IsDemoPrefill = demo;
+            Input = demo
+                ? new InputModel
+                {
+                    Email = "demo@lynqmentrics.com",
+                    Password = "Demo12345!"
+                }
+                : new InputModel();
         }
 
         public async Task<IActionResult> OnPostAsync(string returnUrl = null)

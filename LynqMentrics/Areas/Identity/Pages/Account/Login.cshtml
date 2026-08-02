@@ -6,6 +6,10 @@
 }
 
 <h1>@ViewData["Title"]</h1>
+@if (Model.IsDemoPrefill)
+{
+    <p class="text-muted">Demo credentials have been pre-filled. Click <strong>Log in</strong> to explore LynqMentrics.</p>
+}
 <div class="row">
     <div class="col-md-4">
         <section>

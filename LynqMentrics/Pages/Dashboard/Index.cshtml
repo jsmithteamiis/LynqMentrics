@@ -58,9 +58,12 @@
 
             linksBody.innerHTML = links.map(link => {
                 const shortUrl = `${window.location.origin}/${link.shortCode}`;
+                const demoBadge = /^demo\d+$/i.test(link.shortCode)
+                    ? '<span class="ml-2 inline-flex rounded-full border border-brandCyan/50 bg-brandCyan/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brandCyan">Demo</span>'
+                    : '';
                 return `
                     <tr>
-                        <td class="px-4 py-3"><a class="underline text-brandCyan" href="${shortUrl}" target="_blank" rel="noopener noreferrer">${shortUrl}</a></td>
+                        <td class="px-4 py-3"><a class="underline text-brandCyan" href="${shortUrl}" target="_blank" rel="noopener noreferrer">${shortUrl}</a>${demoBadge}</td>
                         <td class="px-4 py-3 max-w-xs truncate" title="${link.originalUrl}">${link.originalUrl}</td>
                         <td class="px-4 py-3">${new Date(link.createdAt).toLocaleString()}</td>
                         <td class="px-4 py-3">${link.clicksCount}</td>
