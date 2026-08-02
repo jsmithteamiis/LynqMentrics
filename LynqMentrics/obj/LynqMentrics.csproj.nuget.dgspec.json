@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj": {}
+    "C:\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj": {}
   },
   "projects": {
-    "c:\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj": {
+    "C:\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj",
+        "projectUniqueName": "C:\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj",
         "projectName": "LynqMentrics",
-        "projectPath": "c:\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj",
+        "projectPath": "C:\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj",
         "packagesPath": "C:\\Users\\jwsga\\.nuget\\packages\\",
-        "outputPath": "c:\\LynqMentrics\\LynqMentrics\\obj\\",
+        "outputPath": "C:\\LynqMentrics\\LynqMentrics\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\jwsga\\AppData\\Roaming\\NuGet\\NuGet.Config"
