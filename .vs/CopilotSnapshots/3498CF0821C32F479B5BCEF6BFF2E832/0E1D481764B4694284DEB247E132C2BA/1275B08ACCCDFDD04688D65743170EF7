@@ -1,0 +1,9 @@
+﻿using Microsoft.AspNetCore.Identity;
+
+namespace LynqMentrics.Models;
+
+public class AppUser : IdentityUser
+{
+    public bool IsPro { get; set; }
+    public ICollection<Link> Links { get; set; } = new List<Link>();
+}

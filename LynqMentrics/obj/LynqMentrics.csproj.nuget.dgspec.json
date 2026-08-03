@@ -1,25 +1,32 @@
 {
   "format": 1,
   "restore": {
-    "C:\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj": {}
+    "C:\\Users\\jsmith\\source\\repos\\jsmithteamiis\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj": {}
   },
   "projects": {
-    "C:\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj": {
+    "C:\\Users\\jsmith\\source\\repos\\jsmithteamiis\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj",
+        "projectUniqueName": "C:\\Users\\jsmith\\source\\repos\\jsmithteamiis\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj",
         "projectName": "LynqMentrics",
-        "projectPath": "C:\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj",
-        "packagesPath": "C:\\Users\\jwsga\\.nuget\\packages\\",
-        "outputPath": "C:\\LynqMentrics\\LynqMentrics\\obj\\",
+        "projectPath": "C:\\Users\\jsmith\\source\\repos\\jsmithteamiis\\LynqMentrics\\LynqMentrics\\LynqMentrics.csproj",
+        "packagesPath": "C:\\Users\\jsmith\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\jsmith\\source\\repos\\jsmithteamiis\\LynqMentrics\\LynqMentrics\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
         "configFilePaths": [
-          "C:\\Users\\jwsga\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\jsmith\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
         ],
         "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {

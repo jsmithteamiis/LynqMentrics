@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 namespace LynqMentrics.Services;
 
 public class ShortCodeGenerator
@@ -7,10 +9,13 @@ public class ShortCodeGenerator
     public string Generate(int length = 6)
     {
         Span<char> buffer = stackalloc char[length];
+        byte[] randomBytes = new byte[length];
+
+        RandomNumberGenerator.Fill(randomBytes);
 
         for (var i = 0; i < length; i++)
         {
-            buffer[i] = Alphabet[Random.Shared.Next(Alphabet.Length)];
+            buffer[i] = Alphabet[randomBytes[i] % Alphabet.Length];
         }
 
         return new string(buffer);

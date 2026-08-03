@@ -1,0 +1,18 @@
+﻿using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Identity;
+
+namespace LynqMentrics.Models;
+
+public class AppUser : IdentityUser
+{
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(100)]
+    public string UserName { get; set; } = string.Empty;
+
+    public bool IsPro { get; set; }
+    public ICollection<Link> Links { get; set; } = new List<Link>();
+}
