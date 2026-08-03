@@ -271,7 +271,6 @@ C:\LynqMentrics\LynqMentrics\obj\Debug\net10.0\LynqMentrics.pdb
 C:\LynqMentrics\LynqMentrics\obj\Debug\net10.0\LynqMentrics.genruntimeconfig.cache
 C:\LynqMentrics\LynqMentrics\obj\Debug\net10.0\ref\LynqMentrics.dll
 C:\LynqMentrics\LynqMentrics\obj\Debug\net10.0\compressed\mwck694hbu-{0}-90yqlj465b-90yqlj465b.gz
-C:\LynqMentrics\LynqMentrics\obj\Debug\net10.0\compressed\zggxp14jz6-{0}-6b9nfc4n3r-6b9nfc4n3r.gz
 C:\LynqMentrics\LynqMentrics\obj\Debug\net10.0\compressed\dqy90rw97x-{0}-zub09dkrxp-zub09dkrxp.gz
 C:\LynqMentrics\LynqMentrics\obj\Debug\net10.0\compressed\sc4vdbnrxv-{0}-pj5nd1wqec-pj5nd1wqec.gz
 C:\LynqMentrics\LynqMentrics\obj\Debug\net10.0\compressed\eb1yooavw8-{0}-43atpzeawx-43atpzeawx.gz
@@ -584,3 +583,4 @@ C:\Users\jsmith\source\repos\jsmithteamiis\LynqMentrics\LynqMentrics\obj\Debug\n
 C:\Users\jsmith\source\repos\jsmithteamiis\LynqMentrics\LynqMentrics\obj\Debug\net10.0\LynqMentrics.pdb
 C:\Users\jsmith\source\repos\jsmithteamiis\LynqMentrics\LynqMentrics\obj\Debug\net10.0\LynqMentrics.genruntimeconfig.cache
 C:\Users\jsmith\source\repos\jsmithteamiis\LynqMentrics\LynqMentrics\obj\Debug\net10.0\ref\LynqMentrics.dll
+C:\LynqMentrics\LynqMentrics\obj\Debug\net10.0\compressed\zggxp14jz6-{0}-f4bv3q0nel-f4bv3q0nel.gz

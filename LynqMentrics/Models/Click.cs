@@ -11,7 +11,7 @@ public class Click
 
     public DateTime ClickedAt { get; set; } = DateTime.UtcNow;
 
-    [MaxLength(2048)]
+    [MaxLength(4096)]
     public string? Referrer { get; set; }
 
     [MaxLength(2048)]

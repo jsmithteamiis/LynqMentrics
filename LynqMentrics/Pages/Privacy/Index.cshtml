@@ -1,0 +1,136 @@
+@page
+@model LynqMentrics.Pages.Privacy.IndexModel
+@{
+    ViewData["Title"] = "Privacy Center";
+}
+
+<div class="mx-auto max-w-4xl space-y-10">
+    <div class="space-y-3">
+        <p class="inline-flex rounded-full border border-brandCyan/40 bg-brandCyan/10 px-4 py-1 text-sm font-medium text-brandCyan">Your data, your control</p>
+        <h1 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Privacy Center</h1>
+        <p class="text-lg leading-8 text-slate-300">
+            We process personal data in line with the General Data Protection Regulation (GDPR) and the
+            California Consumer Privacy Act (CCPA). Personal information — such as original URLs, referrer
+            URLs, and raw identifiers — is <span class="font-semibold text-white">tokenized at rest</span>
+            and can only be decrypted by the application when you view your own data.
+        </p>
+    </div>
+
+    <div class="grid gap-6 sm:grid-cols-2">
+        <a asp-page="Policy" class="rounded-xl border border-slate-800 bg-slate-900/60 p-5 transition hover:border-brandCyan">
+            <h2 class="font-semibold text-white">Privacy Policy</h2>
+            <p class="mt-1 text-sm text-slate-300">What we collect, why we process it, and the legal bases (GDPR Art. 6).</p>
+        </a>
+        <a asp-page="Cookies" class="rounded-xl border border-slate-800 bg-slate-900/60 p-5 transition hover:border-brandCyan">
+            <h2 class="font-semibold text-white">Cookie Policy</h2>
+            <p class="mt-1 text-sm text-slate-300">The cookies we use and how to control them at any time.</p>
+        </a>
+        <a asp-page="Terms" class="rounded-xl border border-slate-800 bg-slate-900/60 p-5 transition hover:border-brandCyan">
+            <h2 class="font-semibold text-white">Terms of Service</h2>
+            <p class="mt-1 text-sm text-slate-300">The terms that govern your use of the Service.</p>
+        </a>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+            <h2 class="font-semibold text-white">Contact the DPO</h2>
+            <p class="mt-1 text-sm text-slate-300">Questions or requests: <a href="mailto:jsmith.teamiis@gmail.com" class="text-brandCyan underline">jsmith.teamiis@gmail.com</a></p>
+        </div>
+    </div>
+
+    <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-6">
+        <h2 class="text-xl font-semibold text-white">Your rights</h2>
+        <div class="mt-4 grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
+            <p>📄 <span class="font-semibold text-slate-100">Right of access</span> — obtain a copy of your personal data.</p>
+            <p>🗑️ <span class="font-semibold text-slate-100">Right to erasure</span> — request deletion of your account and data.</p>
+            <p>🔄 <span class="font-semibold text-slate-100">Right to data portability</span> — export your data in a machine-readable format.</p>
+            <p>✏️ <span class="font-semibold text-slate-100">Right to rectification</span> — correct inaccurate information.</p>
+            <p>⛔ <span class="font-semibold text-slate-100">Right to object / restrict</span> — limit how your data is processed.</p>
+            <p>🔕 <span class="font-semibold text-slate-100">Right to withdraw consent</span> — change or revoke consent at any time.</p>
+        </div>
+
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <div class="mt-6 border-t border-slate-800 pt-6">
+                <h3 class="text-lg font-semibold text-white">Request your data</h3>
+                <p class="mt-1 text-sm text-slate-300">Exercise your rights directly — your export includes your profile, links, and click analytics.</p>
+                <div class="mt-4 flex flex-wrap gap-3">
+                    <button type="button" id="export-data-btn"
+                            class="inline-flex items-center rounded-lg bg-brandCyan px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300">
+                        Download my data
+                    </button>
+                    <button type="button" id="delete-account-btn"
+                            class="inline-flex items-center rounded-lg border border-rose-500/50 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:bg-rose-500/10">
+                        Delete my account and data
+                    </button>
+                </div>
+                <p id="privacy-feedback" class="mt-3 hidden text-sm"></p>
+            </div>
+        }
+        else
+        {
+            <p class="mt-6 border-t border-slate-800 pt-6 text-sm text-slate-300">
+                <a asp-area="Identity" asp-page="/Account/Login" class="text-brandCyan underline">Sign in</a> to
+                export or delete your personal data directly. You can also email
+                <a href="mailto:jsmith.teamiis@gmail.com" class="text-brandCyan underline">jsmith.teamiis@gmail.com</a>
+                to exercise any of your rights.
+            </p>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const feedback = document.getElementById("privacy-feedback");
+
+        function showFeedback(message, ok = true) {
+            feedback.textContent = message;
+            feedback.className = ok
+                ? "mt-3 text-sm text-brandEmerald"
+                : "mt-3 text-sm text-rose-300";
+            feedback.classList.remove("hidden");
+        }
+
+        async function postJson(url) {
+            return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" } });
+        }
+
+        const exportBtn = document.getElementById("export-data-btn");
+        if (exportBtn) {
+            exportBtn.addEventListener("click", async () => {
+                exportBtn.disabled = true;
+                const response = await postJson("/api/privacy/export");
+                if (!response.ok) {
+                    showFeedback("Could not export your data. Please try again.", false);
+                    exportBtn.disabled = false;
+                    return;
+                }
+                const data = await response.json();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "lynqmentrics-personal-data.json";
+                a.click();
+                URL.revokeObjectURL(url);
+                showFeedback("Your data export has been downloaded.");
+                exportBtn.disabled = false;
+            });
+        }
+
+        const deleteBtn = document.getElementById("delete-account-btn");
+        if (deleteBtn) {
+            deleteBtn.addEventListener("click", async () => {
+                if (!confirm("This permanently deletes your account, links, and analytics. This cannot be undone. Continue?")) {
+                    return;
+                }
+                deleteBtn.disabled = true;
+                const response = await postJson("/api/privacy/delete");
+                if (!response.ok) {
+                    showFeedback("Could not delete your account. Please try again.", false);
+                    deleteBtn.disabled = false;
+                    return;
+                }
+                showFeedback("Your account and data have been erased. Redirecting…");
+                setTimeout(() => { window.location.href = "/"; }, 1200);
+            });
+        }
+    </script>
+}

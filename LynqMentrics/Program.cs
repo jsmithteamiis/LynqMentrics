@@ -53,6 +53,8 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
 
 builder.Services.AddScoped<ShortCodeGenerator>();
 builder.Services.AddScoped<AnalyticsService>();
+builder.Services.AddScoped<PiiTokenizationService>();
+builder.Services.AddHostedService<DataRetentionService>();
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -92,6 +94,7 @@ linksApi.MapPost("/", async (
     AppDbContext dbContext,
     UserManager<AppUser> userManager,
     ShortCodeGenerator shortCodeGenerator,
+    PiiTokenizationService piiTokenizationService,
     CancellationToken cancellationToken) =>
 {
     var userId = userManager.GetUserId(httpContext.User);
@@ -140,7 +143,10 @@ linksApi.MapPost("/", async (
     var link = new Link
     {
         UserId = userId,
-        OriginalUrl = parsedUri.ToString(),
+        // The original URL can embed PII in query strings (e.g. email, name, or
+        // tracking parameters). It is tokenized at rest and detokenized only when
+        // the link owner views it (GDPR/CCPA data protection at rest).
+        OriginalUrl = piiTokenizationService.Tokenize(parsedUri.ToString()) ?? parsedUri.ToString(),
         ShortCode = selectedCode,
         CreatedAt = DateTime.UtcNow
     };
@@ -156,6 +162,7 @@ linksApi.MapGet("/", async (
     HttpContext httpContext,
     AppDbContext dbContext,
     UserManager<AppUser> userManager,
+    PiiTokenizationService piiTokenizationService,
     CancellationToken cancellationToken) =>
 {
     var userId = userManager.GetUserId(httpContext.User);
@@ -178,7 +185,17 @@ linksApi.MapGet("/", async (
         })
         .ToListAsync(cancellationToken);
 
-    return Results.Ok(links);
+    var response = links.Select(link => new
+    {
+        link.Id,
+        link.ShortCode,
+        // Detokenize only for the link owner (this endpoint is authenticated).
+        OriginalUrl = piiTokenizationService.Detokenize(link.OriginalUrl) ?? link.OriginalUrl,
+        link.CreatedAt,
+        link.ClicksCount
+    });
+
+    return Results.Ok(response);
 });
 
 linksApi.MapDelete("/{id:guid}", async (
@@ -225,6 +242,134 @@ linksApi.MapGet("/{id:guid}/stats", async (
 
     var stats = await analyticsService.GetLinkStatsAsync(userId, id, cancellationToken);
     return stats is null ? Results.NotFound() : Results.Ok(stats);
+});
+
+var privacyApi = app.MapGroup("/api/privacy");
+
+// Records a GDPR/CCPA consent decision (grant or withdraw) for audit purposes.
+privacyApi.MapPost("/consent", async (
+    ConsentRequest requestBody,
+    HttpContext httpContext,
+    AppDbContext dbContext,
+    UserManager<AppUser> userManager,
+    IConfiguration configuration,
+    CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(requestBody.ConsentType))
+    {
+        return Results.BadRequest(new { error = "ConsentType is required." });
+    }
+
+    var userId = userManager.GetUserId(httpContext.User);
+    var remoteIp = httpContext.Connection.RemoteIpAddress?.ToString();
+    var ipSalt = configuration["IpHashSalt"] ?? "LynqMentrics_MVP_Static_Salt_2026";
+
+    var consent = new PrivacyConsent
+    {
+        UserId = userId,
+        IpHash = CreateIpHash(remoteIp, ipSalt),
+        ConsentType = requestBody.ConsentType.Trim(),
+        Granted = requestBody.Granted,
+        ConsentVersion = string.IsNullOrWhiteSpace(requestBody.ConsentVersion) ? "1.0" : requestBody.ConsentVersion.Trim(),
+        GrantedAt = DateTime.UtcNow,
+        UserAgent = httpContext.Request.Headers.UserAgent.ToString() is { Length: > 0 } ua ? ua[..Math.Min(ua.Length, 512)] : null
+    };
+
+    dbContext.PrivacyConsents.Add(consent);
+    await dbContext.SaveChangesAsync(cancellationToken);
+    return Results.Ok(new { recorded = true, id = consent.Id });
+});
+
+// Data Subject Access Request (DSAR): right to access / data portability (GDPR
+// Art. 15/20, CCPA §1798.100). Returns a machine-readable JSON export of the
+// authenticated user's personal data, with PII detokenized.
+privacyApi.MapPost("/export", async (
+    HttpContext httpContext,
+    AppDbContext dbContext,
+    UserManager<AppUser> userManager,
+    PiiTokenizationService piiTokenizationService,
+    CancellationToken cancellationToken) =>
+{
+    var user = await userManager.GetUserAsync(httpContext.User);
+    if (user is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var links = await dbContext.Links
+        .AsNoTracking()
+        .Include(link => link.Clicks)
+        .Where(link => link.UserId == user.Id)
+        .OrderByDescending(link => link.CreatedAt)
+        .ToListAsync(cancellationToken);
+
+    var payload = new
+    {
+        exportedAt = DateTime.UtcNow,
+        profile = new
+        {
+            user.Id,
+            user.UserName,
+            user.Email,
+            user.IsPro,
+            user.EmailConfirmed,
+            user.PhoneNumber
+        },
+        links = links.Select(link => new
+        {
+            link.Id,
+            link.ShortCode,
+            OriginalUrl = piiTokenizationService.Detokenize(link.OriginalUrl) ?? link.OriginalUrl,
+            link.CreatedAt,
+            Clicks = link.Clicks.Select(click => new
+            {
+                click.Id,
+                click.ClickedAt,
+                Referrer = piiTokenizationService.Detokenize(click.Referrer) ?? click.Referrer,
+                click.IpHash,
+                click.Country,
+                click.Device,
+                click.Browser
+            })
+        })
+    };
+
+    return Results.Ok(payload);
+});
+
+// Right to erasure ("right to be forgotten", GDPR Art. 17 / CCPA §1798.105).
+// Deletes the authenticated user and all data linked to them (links and their
+// clicks cascade via the database), plus their stored consent records.
+privacyApi.MapPost("/delete", async (
+    HttpContext httpContext,
+    AppDbContext dbContext,
+    UserManager<AppUser> userManager,
+    ILoggerFactory loggerFactory,
+    CancellationToken cancellationToken) =>
+{
+    var user = await userManager.GetUserAsync(httpContext.User);
+    if (user is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var logger = loggerFactory.CreateLogger("PrivacyErasure");
+
+    // Remove consent records tied to this account first (they reference the user).
+    await dbContext.PrivacyConsents
+        .Where(consent => consent.UserId == user.Id)
+        .ExecuteDeleteAsync(cancellationToken);
+
+    var result = await userManager.DeleteAsync(user);
+    if (!result.Succeeded)
+    {
+        var errors = string.Join("; ", result.Errors.Select(e => $"{e.Code}: {e.Description}"));
+        logger.LogError("Erasure failed for user {UserId}: {Errors}", user.Id, errors);
+        return Results.Problem(detail: "Could not erase the account. Please contact support.", statusCode: 500);
+    }
+
+    logger.LogInformation("Account erased for user {UserId}", user.Id);
+    return Results.Ok(new { erased = true });
 });
 
 app.MapGet("/{shortCode:regex(^[a-zA-Z0-9_-]+$)}", async (
@@ -317,13 +462,17 @@ static async Task RecordClickAsync(
 {
     await using var scope = scopeFactory.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var piiTokenizationService = scope.ServiceProvider.GetRequiredService<PiiTokenizationService>();
 
     var click = new Click
     {
         LinkId = linkId,
         ClickedAt = DateTime.UtcNow,
-        Referrer = string.IsNullOrWhiteSpace(referrer) ? null : referrer,
-        UserAgent = string.IsNullOrWhiteSpace(userAgent) ? null : userAgent,
+        // Referrer URLs can contain PII in query strings — tokenize at rest.
+        Referrer = string.IsNullOrWhiteSpace(referrer) ? null : piiTokenizationService.Tokenize(referrer),
+        // Data minimization (GDPR Art. 5): the raw user agent is not stored; only
+        // the derived Device/Browser aggregates below are kept.
+        UserAgent = null,
         IpHash = CreateIpHash(remoteIpAddress, salt),
         Country = country,
         Device = ParseDevice(userAgent),
@@ -392,3 +541,5 @@ static string ParseBrowser(string? userAgent)
 }
 
 internal sealed record CreateLinkRequest(string OriginalUrl, string? CustomSlug);
+
+internal sealed record ConsentRequest(string ConsentType, bool Granted, string? ConsentVersion);

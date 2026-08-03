@@ -1,4 +1,5 @@
 using LynqMentrics.Models;
+using LynqMentrics.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +15,7 @@ public static class DemoDataSeeder
     {
         var userManager = serviceProvider.GetRequiredService<UserManager<AppUser>>();
         var dbContext = serviceProvider.GetRequiredService<AppDbContext>();
+        var piiTokenizationService = serviceProvider.GetRequiredService<PiiTokenizationService>();
 
         var existingDemoUser = await userManager.FindByEmailAsync(DemoEmail);
         if (existingDemoUser is not null)
@@ -42,28 +44,28 @@ public static class DemoDataSeeder
             {
                 UserId = demoUser.Id,
                 ShortCode = "demo1",
-                OriginalUrl = "https://www.producthunt.com/",
+                OriginalUrl = piiTokenizationService.Tokenize("https://www.producthunt.com/")!,
                 CreatedAt = DateTime.UtcNow.AddDays(-10)
             },
             new Link
             {
                 UserId = demoUser.Id,
                 ShortCode = "demo2",
-                OriginalUrl = "https://github.com/trending",
+                OriginalUrl = piiTokenizationService.Tokenize("https://github.com/trending")!,
                 CreatedAt = DateTime.UtcNow.AddDays(-9)
             },
             new Link
             {
                 UserId = demoUser.Id,
                 ShortCode = "demo3",
-                OriginalUrl = "https://www.notion.so/templates",
+                OriginalUrl = piiTokenizationService.Tokenize("https://www.notion.so/templates")!,
                 CreatedAt = DateTime.UtcNow.AddDays(-8)
             },
             new Link
             {
                 UserId = demoUser.Id,
                 ShortCode = "demo4",
-                OriginalUrl = "https://news.ycombinator.com/",
+                OriginalUrl = piiTokenizationService.Tokenize("https://news.ycombinator.com/")!,
                 CreatedAt = DateTime.UtcNow.AddDays(-7)
             }
         };
@@ -107,11 +109,12 @@ public static class DemoDataSeeder
             {
                 Link = link,
                 ClickedAt = clickedAt,
-                Referrer = referrers[Random.Shared.Next(referrers.Length)],
+                Referrer = piiTokenizationService.Tokenize(referrers[Random.Shared.Next(referrers.Length)]),
                 Country = countries[Random.Shared.Next(countries.Length)],
                 Device = device,
                 Browser = browser,
-                UserAgent = $"{browser} Demo/{Random.Shared.Next(100, 140)} ({device})"
+                // Data minimization: raw user-agent strings are not stored.
+                UserAgent = null
             });
         }
 

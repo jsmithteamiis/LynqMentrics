@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LynqMentrics.Services;
 
-public class AnalyticsService(AppDbContext dbContext)
+public class AnalyticsService(AppDbContext dbContext, PiiTokenizationService piiTokenizationService)
 {
     public async Task<LinkStatsResponse?> GetLinkStatsAsync(string userId, Guid linkId, CancellationToken cancellationToken)
     {
@@ -40,7 +40,8 @@ public class AnalyticsService(AppDbContext dbContext)
         return new LinkStatsResponse(
             link.Id,
             link.ShortCode,
-            link.OriginalUrl,
+            // Detokenize only for the authenticated link owner.
+            piiTokenizationService.Detokenize(link.OriginalUrl) ?? link.OriginalUrl,
             link.Clicks.Count,
             clicksToday,
             clicksThisWeek,
@@ -52,8 +53,11 @@ public class AnalyticsService(AppDbContext dbContext)
         );
     }
 
-    private static IReadOnlyList<SourceCount> BuildTopSources(IEnumerable<string?> values, string fallback) =>
+    private IReadOnlyList<SourceCount> BuildTopSources(IEnumerable<string?> values, string fallback) =>
         values
+            // Referrers are stored tokenized — detokenize before grouping so the
+            // aggregated analytics remain accurate.
+            .Select(v => string.IsNullOrWhiteSpace(v) ? fallback : piiTokenizationService.Detokenize(v))
             .Select(v => string.IsNullOrWhiteSpace(v) ? fallback : v)
             .GroupBy(v => v!)
             .OrderByDescending(g => g.Count())

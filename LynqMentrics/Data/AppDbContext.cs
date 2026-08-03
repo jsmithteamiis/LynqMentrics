@@ -8,17 +8,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
 {
     public DbSet<Link> Links => Set<Link>();
     public DbSet<Click> Clicks => Set<Click>();
+    public DbSet<PrivacyConsent> PrivacyConsents => Set<PrivacyConsent>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        builder.Entity<PrivacyConsent>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.GrantedAt);
+            entity.HasIndex(x => x.UserId);
+            entity.Property(x => x.ConsentType).IsRequired().HasMaxLength(64);
+            entity.Property(x => x.ConsentVersion).HasMaxLength(32);
+            entity.Property(x => x.GrantedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
 
         builder.Entity<Link>(entity =>
         {
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => x.ShortCode).IsUnique();
             entity.Property(x => x.ShortCode).IsRequired().HasMaxLength(64);
-            entity.Property(x => x.OriginalUrl).IsRequired().HasMaxLength(2048);
+            entity.Property(x => x.OriginalUrl).IsRequired().HasMaxLength(4096);
             entity.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(x => x.User)

@@ -1,0 +1,29 @@
+@*
+    GDPR/CCPA cookie consent banner. The banner is rendered by the server only when
+    no consent decision has been stored yet. The client-side logic in /js/site.js
+    persists the decision in the "lynq_consent" cookie and records it via
+    POST /api/privacy/consent for the audit trail.
+*@
+<div id="cookie-consent-banner" role="dialog" aria-label="Cookie consent" aria-live="polite"
+     class="fixed inset-x-0 bottom-0 z-50 border-t border-slate-700 bg-slate-900/95 p-5 shadow-2xl backdrop-blur">
+    <div class="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="max-w-3xl">
+            <p class="text-sm text-slate-200">
+                We use strictly necessary cookies to keep you signed in, and — only with your consent —
+                analytics cookies to understand how our Service is used.
+                <a asp-page="/Privacy/Policy" class="text-brandCyan underline hover:text-cyan-300">Privacy Policy</a> ·
+                <a asp-page="/Privacy/Cookies" class="text-brandCyan underline hover:text-cyan-300">Cookie Policy</a>
+            </p>
+        </div>
+        <div class="flex flex-shrink-0 flex-wrap gap-3">
+            <button type="button" data-consent="accept"
+                    class="inline-flex items-center rounded-lg bg-brandCyan px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300">
+                Accept all
+            </button>
+            <button type="button" data-consent="decline"
+                    class="inline-flex items-center rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-brandCyan hover:text-white">
+                Essential only
+            </button>
+        </div>
+    </div>
+</div>
