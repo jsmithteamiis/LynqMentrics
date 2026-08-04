@@ -318,3 +318,44 @@ button {
     rgba(15, 23, 42, 0.75);
   box-shadow: 0 18px 40px -20px rgba(2, 6, 23, 0.9);
 }
+
+/* Focus styles for WCAG 2.2 accessibility */
+*:focus-visible {
+  outline: 2px solid var(--brand-cyan);
+  outline-offset: 2px;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--brand-cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 200, 255, 0.3);
+}
+/* Skip link - hidden until focused */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.skip-link:focus {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  width: auto;
+  height: auto;
+  padding: 0.5rem 1rem;
+  background: var(--slate-950);
+  color: var(--slate-100);
+  z-index: 10000;
+  border-radius: 0.25rem;
+  box-shadow: 0 0 0 2px var(--brand-cyan);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
