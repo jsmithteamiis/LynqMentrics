@@ -5,9 +5,19 @@
 }
 
 <div class="space-y-6">
-    <div>
-        <h1 class="text-3xl font-bold text-white">Link analytics</h1>
-        <p class="text-slate-300">Performance details for your short link.</p>
+    <div class="dashboard-hero rounded-2xl border border-slate-800 p-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <p class="text-xs uppercase tracking-wide text-brandCyan">Realtime Insights</p>
+                <h1 class="text-3xl font-bold text-white">Link analytics</h1>
+                <p class="text-slate-300">Performance details stream automatically for this short link.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="refreshStatsBtn" class="rounded-lg bg-brandCyan px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-300">Refresh</button>
+                <span id="liveStatsStatus" class="rounded-full border border-brandEmerald/40 bg-brandEmerald/10 px-3 py-1 text-xs font-semibold text-brandEmerald">Connecting...</span>
+            </div>
+        </div>
+        <p id="statsLastUpdated" class="mt-3 text-xs text-slate-400">Last update: -</p>
     </div>
 
     <div class="grid gap-4 sm:grid-cols-3">
@@ -52,8 +62,15 @@
 
 @section Scripts {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@9.0.0/dist/browser/signalr.min.js"></script>
     <script>
         const linkId = "@Model.LinkId";
+        const liveStatsStatus = document.getElementById("liveStatsStatus");
+        const statsLastUpdated = document.getElementById("statsLastUpdated");
+        const refreshStatsBtn = document.getElementById("refreshStatsBtn");
+        let clickChart;
+        let loadTimer;
+        let pollingTimer;
 
         function renderTable(targetId, keyName, items) {
             const target = document.getElementById(targetId);
@@ -77,6 +94,44 @@
             `;
         }
 
+        function updateChart(labels, values) {
+            if (!clickChart) {
+                clickChart = new Chart(document.getElementById("clickChart"), {
+                    type: "line",
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: "Clicks",
+                            data: values,
+                            borderColor: "#4F46E5",
+                            backgroundColor: "rgba(79,70,229,0.25)",
+                            tension: 0.3,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { color: "#94a3b8" },
+                                grid: { color: "rgba(148,163,184,0.2)" }
+                            },
+                            x: {
+                                ticks: { color: "#94a3b8" },
+                                grid: { color: "rgba(148,163,184,0.1)" }
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+
+            clickChart.data.labels = labels;
+            clickChart.data.datasets[0].data = values;
+            clickChart.update();
+        }
+
         async function loadStats() {
             const response = await fetch(`/api/links/${linkId}/stats`);
             if (!response.ok) {
@@ -90,42 +145,70 @@
 
             const labels = stats.last7Days.map(d => d.date);
             const values = stats.last7Days.map(d => d.clicks);
-
-            new Chart(document.getElementById("clickChart"), {
-                type: "line",
-                data: {
-                    labels,
-                    datasets: [{
-                        label: "Clicks",
-                        data: values,
-                        borderColor: "#4F46E5",
-                        backgroundColor: "rgba(79,70,229,0.25)",
-                        tension: 0.3,
-                        fill: true
-                    }]
-                },
-                options: {
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: { color: "#94a3b8" },
-                            grid: { color: "rgba(148,163,184,0.2)" }
-                        },
-                        x: {
-                            ticks: { color: "#94a3b8" },
-                            grid: { color: "rgba(148,163,184,0.1)" }
-                        }
-                    }
-                }
-            });
+            updateChart(labels, values);
 
             renderTable("topReferrers", "Source", stats.topReferrers);
             renderTable("topCountries", "Country", stats.topCountries);
             renderTable("topDevices", "Device", stats.topDevices);
             renderTable("topBrowsers", "Browser", stats.topBrowsers);
+            statsLastUpdated.textContent = `Last update: ${new Date().toLocaleTimeString()}`;
         }
 
-        loadStats();
+        function queueRefresh() {
+            if (loadTimer) {
+                window.clearTimeout(loadTimer);
+            }
+
+            loadTimer = window.setTimeout(() => {
+                loadStats().catch(() => undefined);
+            }, 250);
+        }
+
+        async function startRealtime() {
+            if (typeof signalR === "undefined") {
+                liveStatsStatus.textContent = "Polling";
+                liveStatsStatus.className = "rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold text-slate-300";
+                pollingTimer = window.setInterval(queueRefresh, 10000);
+                return;
+            }
+
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl(`/hubs/dashboard?linkId=${encodeURIComponent(linkId)}`)
+                .withAutomaticReconnect()
+                .build();
+
+            connection.on("LinkStatsChanged", (event) => {
+                if (!event || event.linkId?.toLowerCase?.() === linkId.toLowerCase()) {
+                    queueRefresh();
+                }
+            });
+
+            connection.onreconnecting(() => {
+                liveStatsStatus.textContent = "Reconnecting...";
+                liveStatsStatus.className = "rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold text-slate-300";
+            });
+            connection.onreconnected(queueRefresh);
+            connection.onclose(() => {
+                liveStatsStatus.textContent = "Disconnected";
+                liveStatsStatus.className = "rounded-full border border-rose-500/40 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300";
+            });
+
+            try {
+                await connection.start();
+                liveStatsStatus.textContent = "Live";
+                liveStatsStatus.className = "rounded-full border border-brandEmerald/40 bg-brandEmerald/10 px-3 py-1 text-xs font-semibold text-brandEmerald";
+            } catch {
+                liveStatsStatus.textContent = "Polling";
+                liveStatsStatus.className = "rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold text-slate-300";
+                if (!pollingTimer) {
+                    pollingTimer = window.setInterval(queueRefresh, 10000);
+                }
+            }
+        }
+
+        refreshStatsBtn.addEventListener("click", queueRefresh);
+        loadStats()
+            .then(startRealtime)
+            .catch(() => undefined);
     </script>
 }

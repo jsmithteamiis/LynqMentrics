@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using LynqMentrics.Data;
+using LynqMentrics.Hubs;
 using LynqMentrics.Models;
 using LynqMentrics.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -10,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
+builder.Services.AddSignalR();
 
 builder.Services
     .AddDefaultIdentity<AppUser>(options =>
@@ -26,7 +28,8 @@ builder.Services
 var databaseProvider = builder.Configuration["DatabaseProvider"] ??
                        (builder.Environment.IsDevelopment() ? "Sqlite" : "Postgres");
 
-if (databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
+if (databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase) ||
+    databaseProvider.Equals("PostgreSql", StringComparison.OrdinalIgnoreCase))
 {
     var pgConnection = builder.Configuration.GetConnectionString("PostgresConnection")
                        ?? throw new InvalidOperationException("Missing Postgres connection string.");
@@ -54,6 +57,7 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
 builder.Services.AddScoped<ShortCodeGenerator>();
 builder.Services.AddScoped<AnalyticsService>();
 builder.Services.AddScoped<PiiTokenizationService>();
+builder.Services.AddScoped<IDashboardRealtimeNotifier, DashboardRealtimeNotifier>();
 builder.Services.AddHostedService<DataRetentionService>();
 
 builder.Services.ConfigureApplicationCookie(options =>
@@ -85,6 +89,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapRazorPages();
+app.MapHub<DashboardHub>("/hubs/dashboard").RequireAuthorization();
 
 var linksApi = app.MapGroup("/api/links").RequireAuthorization();
 
@@ -95,6 +100,7 @@ linksApi.MapPost("/", async (
     UserManager<AppUser> userManager,
     ShortCodeGenerator shortCodeGenerator,
     PiiTokenizationService piiTokenizationService,
+    IDashboardRealtimeNotifier realtimeNotifier,
     CancellationToken cancellationToken) =>
 {
     var userId = userManager.GetUserId(httpContext.User);
@@ -153,6 +159,8 @@ linksApi.MapPost("/", async (
 
     dbContext.Links.Add(link);
     await dbContext.SaveChangesAsync(cancellationToken);
+    await realtimeNotifier.NotifyLinksChangedAsync(userId, "link-created", cancellationToken);
+    await realtimeNotifier.NotifyLinkStatsChangedAsync(userId, link.Id, cancellationToken);
 
     var shortUrl = $"{httpContext.Request.Scheme}://{httpContext.Request.Host}/{link.ShortCode}";
     return Results.Ok(new { shortUrl, shortCode = link.ShortCode, linkId = link.Id });
@@ -203,6 +211,7 @@ linksApi.MapDelete("/{id:guid}", async (
     HttpContext httpContext,
     AppDbContext dbContext,
     UserManager<AppUser> userManager,
+    IDashboardRealtimeNotifier realtimeNotifier,
     CancellationToken cancellationToken) =>
 {
     var userId = userManager.GetUserId(httpContext.User);
@@ -224,6 +233,8 @@ linksApi.MapDelete("/{id:guid}", async (
 
     dbContext.Links.Remove(link);
     await dbContext.SaveChangesAsync(cancellationToken);
+    await realtimeNotifier.NotifyLinksChangedAsync(userId, "link-deleted", cancellationToken);
+    await realtimeNotifier.NotifyLinkStatsChangedAsync(userId, id, cancellationToken);
     return Results.NoContent();
 });
 
@@ -402,6 +413,7 @@ app.MapGet("/{shortCode:regex(^[a-zA-Z0-9_-]+$)}", async (
     var clickTask = RecordClickAsync(
         scopeFactory,
         link.Id,
+        link.UserId,
         referrer,
         userAgent,
         remoteIp,
@@ -453,6 +465,7 @@ static async Task<string> GenerateUniqueShortCodeAsync(
 static async Task RecordClickAsync(
     IServiceScopeFactory scopeFactory,
     Guid linkId,
+    string ownerUserId,
     string? referrer,
     string? userAgent,
     string? remoteIpAddress,
@@ -463,6 +476,7 @@ static async Task RecordClickAsync(
     await using var scope = scopeFactory.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var piiTokenizationService = scope.ServiceProvider.GetRequiredService<PiiTokenizationService>();
+    var realtimeNotifier = scope.ServiceProvider.GetRequiredService<IDashboardRealtimeNotifier>();
 
     var click = new Click
     {
@@ -481,6 +495,8 @@ static async Task RecordClickAsync(
 
     dbContext.Clicks.Add(click);
     await dbContext.SaveChangesAsync(cancellationToken);
+    await realtimeNotifier.NotifyLinksChangedAsync(ownerUserId, "click-recorded", cancellationToken);
+    await realtimeNotifier.NotifyLinkStatsChangedAsync(ownerUserId, linkId, cancellationToken);
 }
 
 static string? CreateIpHash(string? ipAddress, string salt)

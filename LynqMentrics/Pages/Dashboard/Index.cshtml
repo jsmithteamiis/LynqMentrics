@@ -5,12 +5,42 @@
 }
 
 <div class="space-y-6">
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-            <h1 class="text-3xl font-bold text-white">Your links</h1>
-            <p class="text-slate-300">Manage, copy, and inspect performance for every link.</p>
+    <div class="dashboard-hero rounded-2xl border border-slate-800 p-6">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <p class="text-xs uppercase tracking-wide text-brandCyan">Live Dashboard</p>
+                <h1 class="text-3xl font-bold text-white">Your links</h1>
+                <p class="text-slate-300">Manage, copy, and inspect performance in real time.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button id="refreshBtn" class="inline-flex items-center rounded-lg bg-brandCyan px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-300">Refresh</button>
+                <a asp-page="/Index" class="inline-flex items-center rounded-lg bg-brandIndigo px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Create link</a>
+            </div>
         </div>
-        <a asp-page="/Index" class="inline-flex items-center rounded-lg bg-brandIndigo px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Create link</a>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-3">
+        <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+            <p class="text-sm text-slate-400">Total Links</p>
+            <p id="totalLinks" class="mt-2 text-3xl font-bold text-white">-</p>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+            <p class="text-sm text-slate-400">Total Clicks</p>
+            <p id="totalClicks" class="mt-2 text-3xl font-bold text-white">-</p>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+            <p class="text-sm text-slate-400">Status</p>
+            <p id="liveStatus" class="mt-2 text-sm font-semibold text-brandEmerald">Connecting...</p>
+            <p id="lastUpdated" class="mt-1 text-xs text-slate-400">Last update: -</p>
+        </div>
+    </div>
+
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h2 class="text-lg font-semibold text-white">Link inventory</h2>
+            <p class="text-sm text-slate-400">Updates stream in automatically when links or clicks change.</p>
+        </div>
+        <input id="searchInput" type="text" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-brandIndigo focus:ring-2 focus:ring-brandIndigo" placeholder="Filter by URL or short code..." />
     </div>
 
     <div id="feedback" class="hidden rounded-lg border px-4 py-3 text-sm"></div>
@@ -32,9 +62,19 @@
 </div>
 
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@9.0.0/dist/browser/signalr.min.js"></script>
     <script>
         const linksBody = document.getElementById("links-body");
         const feedback = document.getElementById("feedback");
+        const totalLinks = document.getElementById("totalLinks");
+        const totalClicks = document.getElementById("totalClicks");
+        const lastUpdated = document.getElementById("lastUpdated");
+        const liveStatus = document.getElementById("liveStatus");
+        const searchInput = document.getElementById("searchInput");
+        const refreshBtn = document.getElementById("refreshBtn");
+        let latestLinks = [];
+        let loadTimer;
+        let pollingTimer;
 
         function setFeedback(message, success = true) {
             feedback.className = success
@@ -43,30 +83,36 @@
             feedback.textContent = message;
         }
 
-        async function loadLinks() {
-            const response = await fetch("/api/links");
-            if (!response.ok) {
-                setFeedback("Could not load your links.", false);
+        function updateSummary(links) {
+            totalLinks.textContent = links.length;
+            totalClicks.textContent = links.reduce((sum, link) => sum + link.clicksCount, 0);
+            lastUpdated.textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+        }
+
+        function renderLinks(links) {
+            const filter = searchInput.value.trim().toLowerCase();
+            const filtered = filter.length === 0
+                ? links
+                : links.filter(link =>
+                    link.shortCode.toLowerCase().includes(filter) ||
+                    link.originalUrl.toLowerCase().includes(filter));
+
+            if (!Array.isArray(filtered) || filtered.length === 0) {
+                linksBody.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">No matching links found.</td></tr>`;
                 return;
             }
 
-            const links = await response.json();
-            if (!Array.isArray(links) || links.length === 0) {
-                linksBody.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">No links yet. Create one from the home page.</td></tr>`;
-                return;
-            }
-
-            linksBody.innerHTML = links.map(link => {
+            linksBody.innerHTML = filtered.map(link => {
                 const shortUrl = `${window.location.origin}/${link.shortCode}`;
                 const demoBadge = /^demo\d+$/i.test(link.shortCode)
                     ? '<span class="ml-2 inline-flex rounded-full border border-brandCyan/50 bg-brandCyan/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brandCyan">Demo</span>'
                     : '';
                 return `
-                    <tr>
+                    <tr class="transition hover:bg-slate-900/60">
                         <td class="px-4 py-3"><a class="underline text-brandCyan" href="${shortUrl}" target="_blank" rel="noopener noreferrer">${shortUrl}</a>${demoBadge}</td>
                         <td class="px-4 py-3 max-w-xs truncate" title="${link.originalUrl}">${link.originalUrl}</td>
                         <td class="px-4 py-3">${new Date(link.createdAt).toLocaleString()}</td>
-                        <td class="px-4 py-3">${link.clicksCount}</td>
+                        <td class="px-4 py-3 font-semibold text-white">${link.clicksCount}</td>
                         <td class="px-4 py-3">
                             <div class="flex flex-wrap gap-2">
                                 <a class="rounded-md border border-slate-700 px-2 py-1 text-xs hover:border-brandCyan" href="/Dashboard/Analytics?linkId=${link.id}">Analytics</a>
@@ -87,19 +133,91 @@
 
             linksBody.querySelectorAll("button[data-delete]").forEach(button => {
                 button.addEventListener("click", async () => {
-                    const response = await fetch(`/api/links/${button.dataset.delete}`, {
-                        method: "DELETE"
-                    });
+                    const response = await fetch(`/api/links/${button.dataset.delete}`, { method: "DELETE" });
                     if (!response.ok) {
                         setFeedback("Could not delete the link.", false);
                         return;
                     }
+
                     setFeedback("Link deleted.");
-                    await loadLinks();
                 });
             });
         }
 
-        loadLinks();
+        async function loadLinks() {
+            const response = await fetch("/api/links");
+            if (!response.ok) {
+                setFeedback("Could not load your links.", false);
+                return;
+            }
+
+            const links = await response.json();
+            if (!Array.isArray(links)) {
+                setFeedback("Unexpected links payload.", false);
+                return;
+            }
+
+            latestLinks = links;
+            updateSummary(links);
+            renderLinks(links);
+        }
+
+        function queueRefresh() {
+            if (loadTimer) {
+                window.clearTimeout(loadTimer);
+            }
+
+            loadTimer = window.setTimeout(() => {
+                loadLinks().catch(() => setFeedback("Could not refresh links.", false));
+            }, 250);
+        }
+
+        async function startRealtime() {
+            if (typeof signalR === "undefined") {
+                liveStatus.textContent = "Polling";
+                liveStatus.className = "mt-2 text-sm font-semibold text-slate-300";
+                setFeedback("Live updates are unavailable right now. Using auto-refresh fallback.", false);
+                pollingTimer = window.setInterval(queueRefresh, 10000);
+                return;
+            }
+
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl("/hubs/dashboard")
+                .withAutomaticReconnect()
+                .build();
+
+            connection.on("LinksChanged", queueRefresh);
+            connection.on("LinkStatsChanged", queueRefresh);
+
+            connection.onreconnected(queueRefresh);
+            connection.onreconnecting(() => {
+                liveStatus.textContent = "Reconnecting...";
+                liveStatus.className = "mt-2 text-sm font-semibold text-slate-300";
+            });
+            connection.onclose(() => {
+                liveStatus.textContent = "Disconnected";
+                liveStatus.className = "mt-2 text-sm font-semibold text-rose-300";
+            });
+
+            try {
+                await connection.start();
+                liveStatus.textContent = "Live";
+                liveStatus.className = "mt-2 text-sm font-semibold text-brandEmerald";
+            } catch {
+                liveStatus.textContent = "Polling";
+                liveStatus.className = "mt-2 text-sm font-semibold text-slate-300";
+                setFeedback("Could not establish live updates. Using auto-refresh fallback.", false);
+                if (!pollingTimer) {
+                    pollingTimer = window.setInterval(queueRefresh, 10000);
+                }
+            }
+        }
+
+        refreshBtn.addEventListener("click", () => queueRefresh());
+        searchInput.addEventListener("input", () => renderLinks(latestLinks));
+
+        loadLinks()
+            .then(() => startRealtime())
+            .catch(() => setFeedback("Could not initialize the dashboard.", false));
     </script>
 }
