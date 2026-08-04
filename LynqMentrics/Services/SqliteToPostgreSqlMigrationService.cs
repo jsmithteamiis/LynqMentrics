@@ -10,8 +10,7 @@ using Microsoft.Extensions.Options;
 namespace LynqMentrics.Services;
 
 public sealed class SqliteToPostgreSqlMigrationService(
-    IDbContextFactory<SqliteMigrationDbContext> sqliteFactory,
-    IDbContextFactory<PostgresMigrationDbContext> postgresFactory,
+    IDatabaseConnectionFactory connectionFactory,
     IOptions<DatabaseOptions> optionsAccessor,
     ILogger<SqliteToPostgreSqlMigrationService> logger) : IDataMigrationService
 {
@@ -30,6 +29,7 @@ public sealed class SqliteToPostgreSqlMigrationService(
     ];
 
     private readonly DataMigrationOptions _migrationOptions = optionsAccessor.Value.Migration;
+    private readonly DatabaseOptions _databaseOptions = optionsAccessor.Value;
 
     public async Task MigrateAsync(CancellationToken cancellationToken = default)
     {
@@ -44,8 +44,8 @@ public sealed class SqliteToPostgreSqlMigrationService(
             throw new InvalidOperationException("Database:Migration:BatchSize must be greater than zero.");
         }
 
-        await using var sourceContext = await sqliteFactory.CreateDbContextAsync(cancellationToken);
-        await using var targetContext = await postgresFactory.CreateDbContextAsync(cancellationToken);
+        await using var sourceContext = CreateSqliteContext(connectionFactory);
+        await using var targetContext = CreatePostgreSqlContext(connectionFactory);
 
         await RunPreFlightValidationAsync(sourceContext, targetContext, cancellationToken);
 
@@ -72,8 +72,8 @@ public sealed class SqliteToPostgreSqlMigrationService(
     }
 
     private async Task RunPreFlightValidationAsync(
-        SqliteMigrationDbContext sourceContext,
-        PostgresMigrationDbContext targetContext,
+        AppDbContext sourceContext,
+        AppDbContext targetContext,
         CancellationToken cancellationToken)
     {
         if (!await sourceContext.Database.CanConnectAsync(cancellationToken))
@@ -111,7 +111,7 @@ public sealed class SqliteToPostgreSqlMigrationService(
         }
     }
 
-    private async Task ResetIdentitySequencesAsync(PostgresMigrationDbContext targetContext, CancellationToken cancellationToken)
+    private async Task ResetIdentitySequencesAsync(AppDbContext targetContext, CancellationToken cancellationToken)
     {
         logger.LogInformation("Resetting PostgreSQL identity sequences.");
 
@@ -157,7 +157,7 @@ public sealed class SqliteToPostgreSqlMigrationService(
     }
 
     private static async Task<bool> TableExistsAsync(
-        PostgresMigrationDbContext targetContext,
+        AppDbContext targetContext,
         string tableName,
         CancellationToken cancellationToken)
     {
@@ -165,7 +165,7 @@ public sealed class SqliteToPostgreSqlMigrationService(
             SELECT EXISTS (
                 SELECT 1
                 FROM information_schema.tables
-                WHERE table_schema = 'public' AND table_name = {0});
+                WHERE table_schema = 'public' AND table_name = {0}) AS "Value"
             """;
         return await targetContext.Database.SqlQueryRaw<bool>(existsSql, tableName).SingleAsync(cancellationToken);
     }
@@ -174,17 +174,17 @@ public sealed class SqliteToPostgreSqlMigrationService(
 
     private sealed class TableDefinition
     {
-        private readonly Func<SqliteMigrationDbContext, CancellationToken, Task<int>> _sourceCount;
-        private readonly Func<PostgresMigrationDbContext, CancellationToken, Task<int>> _targetCount;
-        private readonly Func<SqliteMigrationDbContext, PostgresMigrationDbContext, int, ILogger, CancellationToken, Task<TableResult>> _copy;
+        private readonly Func<AppDbContext, CancellationToken, Task<int>> _sourceCount;
+        private readonly Func<AppDbContext, CancellationToken, Task<int>> _targetCount;
+        private readonly Func<AppDbContext, AppDbContext, int, ILogger, CancellationToken, Task<TableResult>> _copy;
 
         public string Name { get; }
 
         private TableDefinition(
             string name,
-            Func<SqliteMigrationDbContext, CancellationToken, Task<int>> sourceCount,
-            Func<PostgresMigrationDbContext, CancellationToken, Task<int>> targetCount,
-            Func<SqliteMigrationDbContext, PostgresMigrationDbContext, int, ILogger, CancellationToken, Task<TableResult>> copy)
+            Func<AppDbContext, CancellationToken, Task<int>> sourceCount,
+            Func<AppDbContext, CancellationToken, Task<int>> targetCount,
+            Func<AppDbContext, AppDbContext, int, ILogger, CancellationToken, Task<TableResult>> copy)
         {
             Name = name;
             _sourceCount = sourceCount;
@@ -216,10 +216,14 @@ public sealed class SqliteToPostgreSqlMigrationService(
 
                         NormalizeTemporalValues(batch);
 
-                        await using var transaction = await target.Database.BeginTransactionAsync(ct);
-                        target.Set<TEntity>().AddRange(batch);
-                        await target.SaveChangesAsync(ct);
-                        await transaction.CommitAsync(ct);
+                        var executionStrategy = target.Database.CreateExecutionStrategy();
+                        await executionStrategy.ExecuteAsync(async () =>
+                        {
+                            await using var transaction = await target.Database.BeginTransactionAsync(ct);
+                            target.Set<TEntity>().AddRange(batch);
+                            await target.SaveChangesAsync(ct);
+                            await transaction.CommitAsync(ct);
+                        });
 
                         copied += batch.Count;
                         target.ChangeTracker.Clear();
@@ -238,16 +242,41 @@ public sealed class SqliteToPostgreSqlMigrationService(
                 });
         }
 
-        public Task<int> CountTargetAsync(PostgresMigrationDbContext target, CancellationToken cancellationToken)
+        public Task<int> CountTargetAsync(AppDbContext target, CancellationToken cancellationToken)
             => _targetCount(target, cancellationToken);
 
         public Task<TableResult> CopyAsync(
-            SqliteMigrationDbContext source,
-            PostgresMigrationDbContext target,
+            AppDbContext source,
+            AppDbContext target,
             int batchSize,
             ILogger logger,
             CancellationToken cancellationToken)
             => _copy(source, target, batchSize, logger, cancellationToken);
+    }
+
+    private AppDbContext CreateSqliteContext(IDatabaseConnectionFactory factory)
+    {
+        var connection = factory.CreateSqliteConnection();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite(connection, sqlite => sqlite.CommandTimeout(_databaseOptions.Sqlite.CommandTimeoutSeconds))
+            .Options;
+        return new AppDbContext(options);
+    }
+
+    private AppDbContext CreatePostgreSqlContext(IDatabaseConnectionFactory factory)
+    {
+        var connection = factory.CreatePostgreSqlConnection();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(connection, npgsql =>
+            {
+                npgsql.CommandTimeout(_databaseOptions.PostgreSql.CommandTimeoutSeconds);
+                npgsql.EnableRetryOnFailure(
+                    _databaseOptions.PostgreSql.MaxRetryCount,
+                    TimeSpan.FromSeconds(_databaseOptions.PostgreSql.MaxRetryDelaySeconds),
+                    errorCodesToAdd: null);
+            })
+            .Options;
+        return new AppDbContext(options);
     }
 
     private static void NormalizeTemporalValues<TEntity>(IEnumerable<TEntity> batch)

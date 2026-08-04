@@ -47,20 +47,6 @@ public static class ServiceCollectionExtensions
                 options.Sqlite);
         });
 
-        services.AddDbContextFactory<SqliteMigrationDbContext>((serviceProvider, optionsBuilder) =>
-        {
-            var options = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
-            var connectionString = ResolveConnectionString(configuration, options.Migration.SourceConnectionStringName);
-            ConfigureSqlite(optionsBuilder, connectionString, options.Sqlite);
-        });
-
-        services.AddDbContextFactory<PostgresMigrationDbContext>((serviceProvider, optionsBuilder) =>
-        {
-            var options = serviceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
-            var connectionString = ResolveConnectionString(configuration, options.Migration.TargetConnectionStringName);
-            ConfigurePostgreSql(optionsBuilder, connectionString, options.PostgreSql);
-        });
-
         services.AddScoped<IDataMigrationService, SqliteToPostgreSqlMigrationService>();
 
         return services;
@@ -91,11 +77,6 @@ public static class ServiceCollectionExtensions
                     TimeSpan.FromSeconds(options.MaxRetryDelaySeconds),
                     errorCodesToAdd: null);
             });
-    }
-
-    private static string ResolveConnectionString(IConfiguration configuration, string connectionStringName)
-    {
-        return ResolveRequiredConnectionString(configuration.GetConnectionString(connectionStringName), connectionStringName);
     }
 
     private static string ResolveRequiredConnectionString(string? connectionString, string connectionStringName)
