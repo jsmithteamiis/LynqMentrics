@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LynqMentrics.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<AppUser>(options)
+public class AppDbContext(DbContextOptions options) : IdentityDbContext<AppUser>(options)
 {
     public DbSet<Link> Links => Set<Link>();
     public DbSet<Click> Clicks => Set<Click>();

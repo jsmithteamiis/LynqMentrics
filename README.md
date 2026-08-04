@@ -106,6 +106,19 @@ Edit `LynqMentrics/appsettings.json`:
 ```json
 {
   "DatabaseProvider": "Sqlite",
+  "Database": {
+    "Provider": "Sqlite",
+    "Sqlite": {
+      "ConnectionStringName": "DefaultConnection",
+      "CommandTimeoutSeconds": 30
+    },
+    "PostgreSql": {
+      "ConnectionStringName": "PostgresConnection",
+      "CommandTimeoutSeconds": 30,
+      "MaxRetryCount": 5,
+      "MaxRetryDelaySeconds": 10
+    }
+  },
   "ConnectionStrings": {
     "DefaultConnection": "Data Source=lynqmentrics.db",
     "PostgresConnection": "Host=YOUR_SUPABASE_HOST;Port=5432;Database=postgres;Username=postgres;Password=YOUR_SUPABASE_PASSWORD;SSL Mode=Require;Trust Server Certificate=true"
@@ -123,7 +136,24 @@ Edit `LynqMentrics/appsettings.json`:
 ### Database provider switch
 
 - Local SQLite: `"DatabaseProvider": "Sqlite"`
-- Supabase/Postgres: `"DatabaseProvider": "Postgres"`
+- Supabase/Postgres: `"DatabaseProvider": "PostgreSql"` (or `"Postgres"`)
+- Preferred typed option: `"Database:Provider": "Sqlite"` or `"PostgreSql"`
+
+### SQLite to PostgreSQL data migration
+
+Set:
+
+- `Database:Migration:Enabled=true`
+- `Database:Migration:SourceConnectionStringName=DefaultConnection`
+- `Database:Migration:TargetConnectionStringName=PostgresConnection`
+
+Run:
+
+```powershell
+dotnet run --project .\LynqMentrics\LynqMentrics.csproj -- --migrate-sqlite-to-postgres
+```
+
+The migration pipeline performs pre-flight checks, batched transactional copy, sequence reset, and row-count validation.
 
 ## Google OAuth Setup
 
@@ -148,7 +178,7 @@ Looks up the short code, records click analytics asynchronously, and redirects t
 ## Notes
 
 - Identity UI pages are scaffolded under `Areas/Identity/Pages`.
-- The app applies EF migrations on startup.
+- The app applies EF migrations on startup for SQLite and ensures schema creation for PostgreSQL.
 - For first-time setup in a new environment, still run `dotnet ef database update` as part of deployment.
 
 ## Deployment (Supabase + Production Hosting)

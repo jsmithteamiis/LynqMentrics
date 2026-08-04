@@ -1,15 +1,19 @@
 using System.Security.Cryptography;
 using System.Text;
+using LynqMentrics.Configuration;
 using LynqMentrics.Data;
 using LynqMentrics.Models;
 using LynqMentrics.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
+
+builder.Services.AddConfiguredDataAccess(builder.Configuration, builder.Environment);
 
 builder.Services
     .AddDefaultIdentity<AppUser>(options =>
@@ -22,22 +26,6 @@ builder.Services
         options.Password.RequiredLength = 8;
     })
     .AddEntityFrameworkStores<AppDbContext>();
-
-var databaseProvider = builder.Configuration["DatabaseProvider"] ??
-                       (builder.Environment.IsDevelopment() ? "Sqlite" : "Postgres");
-
-if (databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
-{
-    var pgConnection = builder.Configuration.GetConnectionString("PostgresConnection")
-                       ?? throw new InvalidOperationException("Missing Postgres connection string.");
-    builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(pgConnection));
-}
-else
-{
-    var sqliteConnection = builder.Configuration.GetConnectionString("DefaultConnection")
-                           ?? throw new InvalidOperationException("Missing SQLite connection string.");
-    builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(sqliteConnection));
-}
 
 var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
 var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
@@ -63,11 +51,29 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 var app = builder.Build();
 
+if (args.Contains("--migrate-sqlite-to-postgres", StringComparer.OrdinalIgnoreCase))
+{
+    await using var migrationScope = app.Services.CreateAsyncScope();
+    var migrationService = migrationScope.ServiceProvider.GetRequiredService<IDataMigrationService>();
+    await migrationService.MigrateAsync();
+    return;
+}
+
 await using (var startupScope = app.Services.CreateAsyncScope())
 {
     var scopeServices = startupScope.ServiceProvider;
     var dbContext = scopeServices.GetRequiredService<AppDbContext>();
-    await dbContext.Database.MigrateAsync();
+    var databaseOptions = scopeServices.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+    var provider = DatabaseProviderResolver.Resolve(databaseOptions.Provider);
+    if (provider == DatabaseProvider.PostgreSql)
+    {
+        await dbContext.Database.EnsureCreatedAsync();
+    }
+    else
+    {
+        await dbContext.Database.MigrateAsync();
+    }
+
     await DemoDataSeeder.SeedAsync(scopeServices);
 }
 
