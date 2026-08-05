@@ -104,7 +104,7 @@ app.UseAuthorization();
 app.MapRazorPages();
 app.MapHub<DashboardHub>("/hubs/dashboard").RequireAuthorization();
 
-var linksApi = app.MapGroup("/api/links").RequireAuthorization().RequireCors("SignalRPolicy");
+var linksApi = app.MapGroup("/api/links").RequireAuthorization();
 
 linksApi.MapPost("/", async (
     CreateLinkRequest requestBody,
