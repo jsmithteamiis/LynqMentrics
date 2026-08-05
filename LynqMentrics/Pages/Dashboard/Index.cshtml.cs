@@ -5,8 +5,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace LynqMentrics.Pages.Dashboard;
 
-[Authorize]
 [EnableCors("SignalRPolicy")]
+[Authorize]
 public class IndexModel : PageModel
 {
     public void OnGet()

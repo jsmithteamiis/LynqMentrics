@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LynqMentrics.Hubs;
 
-[Authorize]
 [EnableCors("SignalRPolicy")]
+[Authorize]
 public sealed class DashboardHub(AppDbContext dbContext) : Hub
 {
     public override async Task OnConnectedAsync()
