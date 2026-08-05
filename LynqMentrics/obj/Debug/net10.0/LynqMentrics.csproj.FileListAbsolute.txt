@@ -584,3 +584,5 @@ C:\Users\jsmith\source\repos\jsmithteamiis\LynqMentrics\LynqMentrics\obj\Debug\n
 C:\Users\jsmith\source\repos\jsmithteamiis\LynqMentrics\LynqMentrics\obj\Debug\net10.0\ref\LynqMentrics.dll
 C:\LynqMentrics\LynqMentrics\obj\Debug\net10.0\compressed\zggxp14jz6-{0}-f4bv3q0nel-f4bv3q0nel.gz
 C:\LynqMentrics\LynqMentrics\obj\Debug\net10.0\compressed\yv4yo77aw1-{0}-pewyyjib8z-pewyyjib8z.gz
+C:\LynqMentrics\LynqMentrics\bin\Debug\net10.0\libman.json
+C:\LynqMentrics\LynqMentrics\obj\Debug\net10.0\compressed\13orfeg2oc-{0}-pgpeah7kws-pgpeah7kws.gz
