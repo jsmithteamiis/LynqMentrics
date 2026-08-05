@@ -94,11 +94,12 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseCors("SignalRPolicy");
 
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseCors("SignalRPolicy");
+
 
 app.MapRazorPages();
 app.MapHub<DashboardHub>("/hubs/dashboard").RequireAuthorization();
