@@ -95,9 +95,8 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
-
-app.UseRouting();
 app.UseCors("SignalRPolicy");
+app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
