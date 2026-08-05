@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace LynqMentrics.Pages.Dashboard;
 
 [Authorize]
+[EnableCors("SignalRPolicy")]
 public class AnalyticsModel : PageModel
 {
     [BindProperty(SupportsGet = true)]

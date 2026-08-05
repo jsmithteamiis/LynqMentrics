@@ -1,12 +1,14 @@
 using System.Security.Claims;
 using LynqMentrics.Data;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace LynqMentrics.Hubs;
 
 [Authorize]
+[EnableCors("SignalRPolicy")]
 public sealed class DashboardHub(AppDbContext dbContext) : Hub
 {
     public override async Task OnConnectedAsync()

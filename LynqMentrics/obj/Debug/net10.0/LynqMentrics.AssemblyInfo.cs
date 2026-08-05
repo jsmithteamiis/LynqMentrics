@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LynqMentrics")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8f2447c5b7c0cf4bb03c6a0461ee9aa77e537ce6")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6b79932c7873a4e89d694a928b4dbf2fea4f02e7")]
 [assembly: System.Reflection.AssemblyProductAttribute("LynqMentrics")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LynqMentrics")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
